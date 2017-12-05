@@ -1,7 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import numpy as np
-import sys
 
 Rw = 461.52
 
@@ -18,5 +17,3 @@ def magnusformel(temp):
         
 def wassergehalt(rH, temp):
     return 1000*(magnusformel(temp) * rH) / (Rw * (temp + 273.15))
-if __name__ == "__main__": 
-    print(wassergehalt(27.0, 22.6)*1000, "g/m3")

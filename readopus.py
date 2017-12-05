@@ -219,13 +219,13 @@ class opus:
 if __name__ == '__main__':
     import pdb
     #test = opus('../CELL_N2O_Loep/131213_46m4_RT_498mb2_av.0')#test.opus')
-    test = opus("Emission_20170703_1416.0")
+    test = opus("/home/philippr/testcali/calibrated/Emission_20170703_0939.0_97.5_7.kali")
     test.print_header()
     import matplotlib.pyplot as plt
     #plt.figure()
-    #plt.plot(test.spcwvn, test.spc, 'k-')
+    plt.plot(test.spcwvn, test.spc, 'k-')
     #plt.figure()
     #plt.plot(test.trmwvn, test.trm, 'r-')
-    plt.figure()
-    plt.plot(test.ifg, 'k-')
+    #plt.figure()
+    #plt.plot(test.s, 'k-')
     plt.show()

@@ -6,6 +6,7 @@ import datetime as dt
 import readopus
 import errorProp
 import luftfeuchtigkeit
+import os
 
 ls=30
 fs=30
@@ -144,17 +145,19 @@ class spectrum:
 
     def plotSpec(self, wnmin=None, wnmax=None, ymin=None, ymax=None, legend=None):
         plt.figure()
-        print(legend)
         for i in range(len(self.__opusFile)):
             spc=[]
             if(wnmin != None and wnmax != None):
                 plt.xlim([wnmin, wnmax])
             if(ymin != None and ymax != None):
                 plt.ylim([ymin, ymax])
-            for j in self.__opusFile[i].ifg:
+            for j in self.__opusFile[i].spc:
                 spc.append(j*1e2)
                 #spc.append(j)
-            plt.plot(self.__opusFile[i].spcwvn, self.__opusFile[i].spc, label=legend[i], lw=2)
+            if(legend != None):
+                plt.plot(self.__opusFile[i].spcwvn, self.__opusFile[i].spc, label=legend[i], lw=2)
+            else:
+                plt.plot(self.__opusFile[i].spcwvn, self.__opusFile[i].spc, lw=2)
         plt.grid(True)
         plt.tick_params(labelsize=ls)
         plt.xlabel(r"Wavenumber ($\mathrm{cm^{-1}}$)", fontsize=fs)
@@ -514,22 +517,3 @@ class spectrum:
             f.write("{}\t{}\n".format(wavenumber[i], spectrum[i]))
 
         f.close()
-        
-if __name__ == "__main__":
-
-    path = ""
-    
-    spectra = ["{}blackbodyCalib_20170703_1413.0".format(path), \
-               "{}blackbodyCalib_20170703_1432.0".format(path), \
-               "{}Emission_20170703_1416.0".format(path)]
-
-    lgd = [r"Blackbody at $9^{\circ}\mathrm{C}$", r"Blackbody at $100^{\circ}\mathrm{C}$", "Atmospheric Emission"]
-
-    a = spectrum(spectra)
-    #a.readKlimalogg("/home/philipp/Documents/Polarstern/fft/KlimaLoggPro_0619.csv", ['"TI"'], deviceRH=['"RHI"'])
-    #a.blackbody(273.15, wnmin=1400, wnmax=2000, ymin=0.0, ymax=0.3)
-    #a.toText(fname="fullSmooth.dat", wnmin=1400, wnmax=2000, smooth=0.003)
-    a.plotSpec(wnmin=500, wnmax=2000, ymin=-0.1, ymax=0.5, legend=lgd)
-    #a.corrSpec(wnmin=800, wnmax=1100, humidity=True)
-    #a.plotIntVsTime()
-    #    a.opusToSfit([0.0], [6396.2], [81.82], [11.34], [0.01], year=None, month=None, day=None, hour=None, minute=None, comment="Empty", wnmin=0, wnmax=2000)
