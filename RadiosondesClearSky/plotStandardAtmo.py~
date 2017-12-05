@@ -1,0 +1,97 @@
+#!/usr/bin/python2
+
+import matplotlib.pyplot as plt
+import radio
+
+#f = open("reference.prf", "r")
+f = open("radio0715w06.prf", "r")
+cont = f.readlines()
+f.close()
+
+altitudes = []
+altitudesReversed = []
+temperatures = []
+temperaturesReversed = []
+pressure = []
+
+raw_alt = cont[2:11]
+raw_temp = cont[22:31]
+raw_pres = cont[12:21]
+
+for element in raw_alt:
+    for element2 in element.split(" "):
+        try:
+            altitudes.append(float(element2)*1000)
+        except:
+            pass
+
+for element in raw_pres:
+    for element2 in element.split(" "):
+        try:
+            pressure.append(float(element2))
+        except:
+            pass
+        
+for element in raw_temp:
+    for element2 in element.split(" "):
+        try:
+            temperatures.append(float(element2)-273.15)
+        except:
+            pass
+
+x = radio.radiosonde("PS170715.w06")
+temperatureRadio = x.returnTemp()
+temperatureRadioNew = []
+reversedTemperatureRadioNew= []
+altitudeRadio = x.returnAlt()
+pressureRadio = x.returnPressure()
+
+#print(altitudeRadio)
+#print(temperatureRadio[-1])
+
+
+fig, ax1 = plt.subplots()
+#ax1.plot(pressure, altitudes, "r", label="Pressure")
+#ax2 = ax1.twiny()
+ax1.plot(temperatures, altitudes, "b+", label="Temperature SFIT4")
+ax1.plot(temperatureRadio, altitudeRadio, "r", label="Temerature Radiosonde")
+#plt.ylim([0, 25e3])
+plt.show()
+exit(-1)
+
+#Reverse List
+for i in reversed(altitudes):
+    altitudesReversed.append(i)
+counter = 0
+
+for i in reversed(temperatures):
+    temperaturesReversed.append(i)
+
+for element in altitudesReversed:
+    #print(element)
+    for i in range(len(temperatureRadio)):
+        if(altitudeRadio[i] < (element + 20) and altitudeRadio[i] > (element - 20)):
+            temperatureRadioNew.append(temperatureRadio[i])
+            break
+        elif(element > 20500):
+            temperatureRadioNew.append(temperaturesReversed[counter])
+            break
+    counter = counter + 1
+
+reversedTemperatureRadioNew = []
+for element in reversed(temperatureRadioNew):
+    reversedTemperatureRadioNew.append(element)
+
+for i in range(0, len(reversedTemperatureRadioNew), 5):
+    try:
+        print("  {:.4E}   {:.4E}   {:.4E}   {:.4E}   {:.4E}".format(float(reversedTemperatureRadioNew[i])+273.15, \
+                                                                    float(reversedTemperatureRadioNew[i+1])+273.15, \
+                                                                    float(reversedTemperatureRadioNew[i+2])+273.15, \
+                                                                    float(reversedTemperatureRadioNew[i+3])+273.15, \
+                                                                    float(reversedTemperatureRadioNew[i+4])+273.15))
+    except:
+        print("  {:.4E}".format(float(reversedTemperatureRadioNew[i])+273.15))
+    
+ax1.plot(temperatureRadioNew, altitudesReversed, "g+", label="Temperature Radiosonde regrid")
+plt.legend()
+#plt.show()

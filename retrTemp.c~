@@ -1,0 +1,43 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#define PLANCK 6.62607004 * pow(10, -34)
+#define MAXWELL 299792458
+#define BOLTZMANN 1.38064852 * pow(10, -23)
+
+/*gcc -o retrTemp retrTemp.c -lm -O2
+  filename: fullSmooth.dat*/
+
+typedef struct{
+double *element;
+int numElements; 
+}vector;
+
+void init(vector *, int);
+void append(vector *, double);
+double norm2(vector *);
+double distance(vector *, vector *);
+
+double opusBlackbody(double, double);
+
+int main(int argc, char **argv) {
+
+  double startTemperature = atof(argv[1]);
+  double a;
+  FILE *spectrum = fopen(argv[2], "r");
+  fscanf(spectrum, "%lf\n", &a);
+  printf("%lf\n", a);
+  fclose(spectrum);
+ 
+  return 0;
+}
+
+double opusBlackbody(double temperature, double step) {
+  return 2 * pow(10, 8) * PLANCK * pow(MAXWELL, 2) * pow(step, 3) / (exp(100 * step * PLANCK * MAXWELL / (BOLTZMANN * temperature)) - 1);
+}
+
+void init(vector *self, int number) {
+self->element = malloc(number * sizeof(double));
+numElements = 0;
+}
