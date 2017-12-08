@@ -113,9 +113,7 @@ class radiosonde:
         f.close()
 
         altitudes = []
-        altitudesReversed = []
         temperatures = []
-        temperaturesReversed = []
         pressure = []
         
         #Depending on the shape of reference.prf
@@ -152,13 +150,12 @@ class radiosonde:
         
         temperatureRadioNew = []
             
-        print(temperatures)
-        print(temperatureRadio)
+        #print(temperatures)
+        #print(temperatureRadio)
         
         print(altitudes)
         print(altitudeRadio)
             
-        counter = 0
         for element in altitudes:
 #                #print(element)
             for i in range(len(temperatureRadio)):
@@ -189,4 +186,4 @@ if __name__ == "__main__":
     x = radiosonde(filename)
     #x.plot(3,2, xmin=-75, xmax=10, ymin=0, ymax=25000)
     #x.showHeader()
-    x.interpolateSFIT()
+    #x.interpolateSFIT()

@@ -8,7 +8,7 @@ path = "/home/philippr/testcali/calibrated"
 spectra = os.listdir(path)
 
 for i in range(len(spectra)):
-    if(spectra[i] == "Emission_20170703_0939.0_95_12.5.kali"):
+    if(spectra[i] == "Emission_20170703_0939.0_96_13.kali"):
         plotting = "{}/{}".format(path, spectra[i])
     spectra[i] = "{}/{}".format(path, spectra[i])
     print(i, spectra[i])

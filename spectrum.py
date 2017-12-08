@@ -308,7 +308,8 @@ class spectrum:
     def getSpc(self, index=0):
         return np.array(self.__opusFile[index].spcwvn)
            
-    def errorTotalPower(self, deltaS_C, deltaS_H, deltaS_A, deltaT_H, deltaT_C, THot, TCold, plot=True, wnmin=1, wnmax=2000, ymax=None, ymin=None):
+    #Delta T_H und Delta T_C sind durch den Fehler der Infrarotkamera FLIR E40 gegeben
+    def errorTotalPower(self, deltaS_C, deltaS_H, deltaS_A, THot, TCold, deltaT_H=2.0, deltaT_C=2.0, plot=True, wnmin=1, wnmax=2000, ymax=None, ymin=None):
         '''
         Calculate an error propagation for a calibrated spectrum. Takes cold blackbody (first spec), hot blackbody (second spec), emission spectrum (third spec) and the calibrated spectrum (forth spec). See ErrorTotalPower.pdf (German only)
         '''
@@ -487,18 +488,6 @@ class spectrum:
             self.__opusFile[i].print_header()
         return
 
-    #Wellenzahlen 1400cm-1 bis 2000cm-1
-    #def retrTemp(self, tStart=0.0):
-    #    temperature = tStart
-    #    while(True):
-    #        [wavenumber, spectrum, bb] = self.blackbody(temperature, wnmin=1400, wnmax=2000, ymin=0.0, ymax=0.3, plot=False)
-    #        for i in range(len(wavenumber)):
-    #            if(wavenumber[i] > 1400):
-    #                lower = i
-    #                break
-    #        upper = len(wavenumber)-1
-    #        #print(wavenumber[lower], wavenumber[upper])
-    
     def toText(self, fname, wnmin=0, wnmax=2000, smooth=0.0):
         f = open(fname, "w")
         spectrum = []
@@ -517,3 +506,4 @@ class spectrum:
             f.write("{}\t{}\n".format(wavenumber[i], spectrum[i]))
 
         f.close()
+        return
