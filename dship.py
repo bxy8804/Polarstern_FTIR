@@ -10,6 +10,8 @@ Script for easy reading and searching the Polarstern dship files
 
 import mpl_toolkits.basemap as bm
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import matplotlib.cbook as cbook
 import datetime as dt
 import numpy as np
 import csv
@@ -373,7 +375,11 @@ class dship:
         return
         
 if __name__ == "__main__":
-    path = "./"
+    years = mdates.YearLocator()   # every year
+    months = mdates.MonthLocator()  # every month
+    yearsFmt = mdates.DateFormatter('%Y')
+
+    path = "/home/philipp/Arbeit/Backup Polarstern/DSHIP/"
     filename = "index.dat"
     day = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", \
            "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", \
@@ -385,8 +391,8 @@ if __name__ == "__main__":
     #for m in month:
     #    for d in day:
     #        try:
-    start = dt.datetime(2017, 5, 22,0,0,0)#UTC
-    end = dt.datetime(2017, 6, 1,0,0,0)#UTC
+    start = dt.datetime(2017, 7, 23,0,0,0)#UTC
+    end = dt.datetime(2017, 8, 19,0,0,0)#UTC
     x = dship(path,filename, start, end)
     x.read()
     ceiling = []
@@ -402,12 +408,14 @@ if __name__ == "__main__":
     for element in y[1]:
         lat.append(element)
     plt.figure()
-    plt.semilogy(lat, ceiling, "kx")
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+    plt.semilogy(date, ceiling, "kx")
     #plt.plot(lat, ceiling, "kx")
     plt.tick_params(axis='both', labelsize=20)
     plt.ylim([-999, 50000])
-    plt.xlim([55, 78])
-    plt.xlabel(r"Latitude ($^{\circ}$)", fontsize=30)
+    #plt.xlim([55, 78])
+    #plt.xlabel(r"Latitude ($^{\circ}$)", fontsize=30)
+    plt.xlabel("Date", fontsize=30)
     plt.ylabel(r"Ceiling ($\mathrm{ft}$)", fontsize=30)
     plt.grid(True)
     plt.show()

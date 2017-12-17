@@ -155,14 +155,14 @@ class spectrum:
                 spc.append(j*1e2)
                 #spc.append(j)
             if(legend != None):
-                plt.plot(self.__opusFile[i].spcwvn, self.__opusFile[i].spc, label=legend[i], lw=2)
+                plt.plot(self.__opusFile[i].spcwvn, self.__opusFile[i].spc, label=r"{}".format(legend[i]), lw=2)
             else:
                 plt.plot(self.__opusFile[i].spcwvn, self.__opusFile[i].spc, lw=2)
         plt.grid(True)
         plt.tick_params(labelsize=ls)
         plt.xlabel(r"Wavenumber ($\mathrm{cm^{-1}}$)", fontsize=fs)
-        #plt.ylabel(r"Intensity ($\mathrm{mW/cm^2 \cdot sr \cdot cm^{-1}}$)", fontsize=fs)
-        plt.ylabel("Intensity (arb. Unit)", fontsize=fs)
+        plt.ylabel(r"Intensity ($\mathrm{mW/cm^2 \cdot sr \cdot cm^{-1}}$)", fontsize=fs)
+        #plt.ylabel("Intensity (arb. Unit)", fontsize=fs)
         #plt.xlabel("OPD (cm)", fontsize=fs)
         plt.legend(fontsize=fs)
         #plt.savefig("{}_all.svg".format(self.__names[2]))
