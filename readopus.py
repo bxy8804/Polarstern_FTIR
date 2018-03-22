@@ -219,13 +219,20 @@ class opus:
 if __name__ == '__main__':
     import pdb
     #test = opus('../CELL_N2O_Loep/131213_46m4_RT_498mb2_av.0')#test.opus')
-    test = opus("/home/philippr/testcali/calibrated/Emission_20170703_0939.0_97.5_7.kali")
+    test = opus("/mnt/ftirrd02/rawdata/ftir/rsync_bck/Equinox_Polarstern/PS106/06162017/blackbody/blackbodyCalib_20170616_2329.0")
+    test2 = opus("/mnt/ftirrd02/rawdata/ftir/Equinox_Polarstern/PS106/06162017/blackbody/blackbodyCalib_20170616_2329.0")
     test.print_header()
     import matplotlib.pyplot as plt
+    print(len(test.ifg))
+    print(len(test.ifgopd))
+    #for element in x:
+    #    print(x)
     #plt.figure()
-    plt.plot(test.spcwvn, test.spc, 'k-')
+    #plt.plot(x[1:], test.ifg[1:])
+    #plt.plot(test.spcwvn, test.spc, 'k-')
     #plt.figure()
     #plt.plot(test.trmwvn, test.trm, 'r-')
     #plt.figure()
     #plt.plot(test.s, 'k-')
-    plt.show()
+    #plt.show()
+    #plt.close()

@@ -1,17 +1,9 @@
 #!/usr/bin/python
 
-import os
 from spectrum import spectrum
-    
-path = "/home/philippr/testcali/calibrated"
 
-spectra = os.listdir(path)
-
-for i in range(len(spectra)):
-    if(spectra[i] == "Emission_20170703_0939.0_96_13.kali"):
-        plotting = "{}/{}".format(path, spectra[i])
-    spectra[i] = "{}/{}".format(path, spectra[i])
-    print(i, spectra[i])
-
-a = spectrum([plotting])
-a.plotSpec(wnmin=500, wnmax=2000, ymin=-0.0, ymax=0.1)
+#a = spectrum(["/home/philippr/DISORT_4/disort4.0.98/Emission_20170715_0344.2.kali"])
+a = spectrum(["/mnt/procdata/ftir/Equinox_Polarstern/PS106_timestamp/Emission_20170708_1600.0.kali"])#Stratus, clear sky?
+#a.plotSpec(wnmin=1400, wnmax=700, ymin=0, ymax=1.2e2, offset=0.004, legend=["06-30-2017 16:40 UTC", "07-14-2017 23:58 UTC", "06-15-2017 07:00 UTC"] )
+a.plotSpec(wnmin=1400, wnmax=700, ymin=0, ymax=1.2e2, offset=0.000)
+a.toText("Emission_20170708_1600.0.kali.dat")

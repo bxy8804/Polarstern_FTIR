@@ -143,7 +143,7 @@ class spectrum:
                 
         return self.__timeindex
 
-    def plotSpec(self, wnmin=None, wnmax=None, ymin=None, ymax=None, legend=None):
+    def plotSpec(self, wnmin=None, wnmax=None, ymin=None, ymax=None, legend=None, offset=0.0, lw=1):
         plt.figure()
         for i in range(len(self.__opusFile)):
             spc=[]
@@ -152,19 +152,19 @@ class spectrum:
             if(ymin != None and ymax != None):
                 plt.ylim([ymin, ymax])
             for j in self.__opusFile[i].spc:
-                spc.append(j*1e2)
+                spc.append((j+offset)*1e3)
                 #spc.append(j)
             if(legend != None):
-                plt.plot(self.__opusFile[i].spcwvn, self.__opusFile[i].spc, label=legend[i], lw=2)
+                plt.plot(self.__opusFile[i].spcwvn, spc, label=legend[i], lw=lw)
             else:
-                plt.plot(self.__opusFile[i].spcwvn, self.__opusFile[i].spc, lw=2)
+                plt.plot(self.__opusFile[i].spcwvn, spc, lw=lw)
         plt.grid(True)
         plt.tick_params(labelsize=ls)
         plt.xlabel(r"Wavenumber ($\mathrm{cm^{-1}}$)", fontsize=fs)
-        #plt.ylabel(r"Intensity ($\mathrm{mW/cm^2 \cdot sr \cdot cm^{-1}}$)", fontsize=fs)
-        plt.ylabel("Intensity (arb. Unit)", fontsize=fs)
+        plt.ylabel(r"Radiance ($\mathrm{mW/(m^2 \cdot sr \cdot cm^{-1})}$)", fontsize=fs)
+        #plt.ylabel("Intensity (arb. Unit)", fontsize=fs)
         #plt.xlabel("OPD (cm)", fontsize=fs)
-        plt.legend(fontsize=fs)
+        plt.legend(fontsize=fs, loc=2)
         #plt.savefig("{}_all.svg".format(self.__names[2]))
         plt.show()
         plt.close()
@@ -497,13 +497,13 @@ class spectrum:
                 wavenumber.append(self.__opusFile[0].spcwvn[i])
                 spectrum.append(self.__opusFile[0].spc[i])
 
-        for j in range(1000):
-            for i in range(len(spectrum)):
-                if(i > 0 and np.abs(spectrum[i-1] - spectrum[i]) > smooth):#Lazy evaluation?
-                    spectrum[i] = (spectrum[i-1] + spectrum[i+1]) / 2.0
+        #for j in range(1000):
+        #    for i in range(len(spectrum)):
+        #        if(i > 0 and np.abs(spectrum[i-1] - spectrum[i]) > smooth):#Lazy evaluation?
+        #            spectrum[i] = (spectrum[i-1] + spectrum[i+1]) / 2.0
 
         for i in range(len(spectrum)):
-            f.write("{}\t{}\n".format(wavenumber[i], spectrum[i]))
+            f.write("{};{}\n".format(wavenumber[i], spectrum[i]))
 
         f.close()
         return

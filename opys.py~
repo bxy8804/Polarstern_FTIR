@@ -1,0 +1,622 @@
+#!/usr/bin/python
+# coding: utf8
+
+'''
+An interface for accessing header and data blocks of Opus files.
+Matthias Buschmann, IUP Bremen, 20160405
+'''
+
+
+import os, struct
+import numpy as np
+import sys
+
+class opys():
+    '''Python class to interact with Bruker Opus files.\n\n
+    Version 2016-05-10\n\n
+    Usage: 
+        opysobject = opys(path, verbose=False, getspc=False, getifg=False, gettrm=False)
+    
+    returns an instance of this class, with access to the header and data blocks of the Opus file.
+    
+    Example:
+    
+        import matplotlib.pyplot as plt
+        
+        opysobject = opys(path, verbose=False, getspc=True)
+        
+        opysobject.print_header()
+        
+        if opysobject.has_block('Data Block SpSm'):
+            plt.figure()
+            plt.title('Opys spectrum of '+opysobject.filename)
+            plt.plot(opysobject.spcwvn, opysobject.spc, 'k-')
+            plt.show()
+    '''
+
+    def search_header_par(self, par):
+        '''search the opus header for parameter <par> and return datablock designation '''
+        pars = []
+        for i in self.header.keys():
+            for j in self.header[i].keys():
+                if par == j:
+                    pars.append(i)
+        if len(pars)==1:
+            return pars[0]
+        elif len(pars)>1:
+            if self.verbose: print('Found parameter in multiple datablocks')
+            return pars
+        else:
+            if self.verbose: print('Parameter', par, 'not found in header!')
+            return None
+
+    def get_header_par(self, par):
+        try:
+            return self.header[self.search_header_par(par)][par]
+        except:
+            print('Parameter not found in header ...')
+            return None
+
+    def read_structure(self):
+        '''Read the structure of the Opus file and write to opys.filestructure.'''
+        self.__blocknames =    {'160': 'Sample Parameters',
+                        '132': 'Data Block',
+                        '96': 'Optic Parameters',
+                        '64': 'FT Parameters',
+                        '48': 'Acquisition Parameters',
+                        '32': 'Instrument Parameters',
+                        '31': 'Data Parameters',
+                        '23': 'Data Parameters',
+                        '15': 'Data Block',
+                        '7':  'Data Block',
+                        '0':  '[unknown block 0]'}
+        self.__subblocknames = {'132': ' ScSm',
+                        '4': ' SpSm', 
+                        '8': ' IgSm', 
+                        '20': ' TrSm',
+                        '\x84': ' SpSm/2.Chn.', 
+                        '\x88': ' IgSm/2.Chn.'}
+        self.__subtypesuffix = {
+        '8': '', 
+        '\x88': ' 2'}
+        self.filestructure = {}
+        with open(self.path, 'rb') as f:
+            f.seek(0)
+            self.log.append('Reading file structure')
+            (magic, undef, undef, dof, tdb, ndb) = struct.unpack('6i', f.read(struct.calcsize('6i')))
+            f.seek(dof)
+            for i in range(ndb):#while ndb > 0:
+                s = f.read(struct.calcsize('2BH2i'))
+                (blocktype, subblocktype, undef, length, offset) = struct.unpack('2BH2i',s)
+                blocktype = str(blocktype)
+                subblocktype = str(subblocktype)
+                if blocktype in self.__blocknames.keys():
+                    hdrblockname = self.__blocknames[blocktype]
+                else:
+                    hdrblockname = '[unknown block '+blocktype+']'
+                if subblocktype in self.__subblocknames.keys():
+                    hdrblockname += self.__subblocknames[subblocktype]
+                else: pass                    
+                if subblocktype in self.__subtypesuffix.keys():
+                    hdrblockname += self.__subtypesuffix[subblocktype]
+                else: pass
+                self.log.append('Found Opus block '+str(blocktype)+', '+str(subblocktype)+' and identified as '+hdrblockname)
+                if blocktype == '0':
+                    hdrblockname += ' len %3i' % (length)
+                else:
+                    pass
+                self.filestructure[hdrblockname] = {'blocktype': blocktype, 'subblocktype': subblocktype, 'length': length, 'offset': offset}
+                
+    def get_single_param_from_block(self, par):
+        '''Retrieve a single parameter from the Opus file, including binary length and offset. This is needed to repack and replace a header parameter later.'''
+        block = self.search_block(self.search_header_par(par))
+        ll = self.getparamsfromblock(block['offset'], block['length'], full=True)
+        for l in ll:
+            if l[0][:len(par)]==par:
+                return l
+            else: pass
+
+    def change_header_par(self, newfilename, par, newval):
+        '''Write a new file to path <newfilename>, which is a copy of opys.path, except for one header parameter <par>, which has been replaced by <newval>. Skips if anything would be overwritten.'''
+        parline = self.get_single_param_from_block(par)
+        #print par, parline
+        if os.path.exists(newfilename):
+            print('File already exists: ', newfilename, ' not doing anything ...')
+            self.log.append('File already exists: '+newfilename+' not doing anything ...')
+        else:
+            (pn, mtype, leng, offset, val) = parline
+            if mtype == 0:
+                dat = struct.pack('i', newval)
+            elif mtype == 1:
+                dat = struct.pack('d', newval)
+            elif mtype >= 2 and mtype <=4:
+                dat = struct.pack(str(2*leng)+'s', newval)
+            dat = struct.pack('4s2H', *(pn, mtype, leng))+dat
+            with open(self.path, 'rb') as f:
+                oldfile = f.read()
+            newfile = oldfile[:offset]+dat+oldfile[offset+len(dat):]
+            self.log.append('Writing '+newfilename+' with new header ...')
+            with open(newfilename, 'wb') as f:
+                f.write(newfile)
+            print('Replaced header in opus file: ', newfilename)
+
+    def getparamsfromblock(self, offset, length, full=False):
+        '''Read all parameters in a block at binary <length> and <offset> and return as dictionary. On request also include binary length and offset of that parameter.'''
+        params = {}
+        i=0
+        test = True
+        fullblock = []
+        with open(self.path, 'rb') as f:
+            while test:
+                f.seek(offset+i)
+                s = f.read(8)
+                pn, mtype, leng = struct.unpack('4s2H', s)
+                #print pn, mtype, leng
+                if full:
+                    fullblocktmp = [pn, mtype, leng, offset+i]
+                i+=8
+                if pn[-1]=='\x00': #get null terminated string
+                    pn=pn[:-1]
+                else: pass
+                #print pn
+                if pn[:3] != 'END' and leng>0:
+                    f.seek(offset+i)
+                    dat = f.read(2*leng)
+                    i+=2*leng
+                    try:
+                        if mtype == 0:
+                            val = struct.unpack(str(len(dat)/4)+'i', dat)[0]
+                        elif mtype == 1:
+                            val = struct.unpack(str(len(dat)/8)+'d', dat)[0]
+                        elif mtype >= 2 and mtype <=4:
+                            t = struct.unpack(str(2*leng)+'s', dat)[0]
+                            t2 = ''
+                            for j in t:
+                                if j!='\x00' and type(j)==str:
+                                    t2 += j
+                                else:
+                                    break
+                            val=t2
+                        else:
+                            val= '[read error]'
+                        params[pn] = val
+                        if full:
+                            fullblocktmp.append(val)
+                            fullblock.append(fullblocktmp)
+                    except Exception, e:
+                        print('Exception in getparamsfromblock')
+                        print(e)
+                else:
+                    test = False
+        if full:
+            return fullblock
+        else:
+            return params
+
+
+    def read_header(self):
+        '''Read the Opus header and return as a dictionary.'''
+        self.log.append('Reading Header ...')
+        self.read_structure()
+        self.header = {}
+        #self.other_header = {}
+        for block in self.filestructure.keys():
+            if block[:10]!='Data Block' and self.filestructure[block]['length']>0:
+                if block[:21]=='[unknown block 0] len':
+                    #try:
+                    #    self.log.append('Fetching (other) Header Block: '+block)
+                    #    self.other_header[block] = self.getparamsfromblock(self.filestructure[block]['offset'], self.filestructure[block]['length'], full=True)
+                    #except Exception, e: #else:
+                    #    print e
+                    #    self.log.append(e)
+                    pass
+                else:
+                    try: #print self.__blocknames[block], block
+                        self.log.append('Fetching Header Block: '+block)
+                        self.header[block] = self.getparamsfromblock(self.filestructure[block]['offset'], self.filestructure[block]['length'], full=False)
+                    except Exception, e: #else:
+                        print e
+                        self.log.append(e)#'Omitting header block'+self.__blocknames[block])
+            else: pass
+        return 0
+
+    def save_header(self, outfilename):
+        '''Save Opus header dictionary to <outfilename>'''
+        #print(self.header)
+        if self.verbose: print 'Writing header dictionary to', outfilename
+        with open(outfilename, 'w') as of:
+            for i in self.header.keys():
+                of.write(i+'\n')
+                for j in self.header[i].keys():
+                    of.write('  '+str(j)+': '+str(self.header[i][j])+'\n')
+        if self.verbose: print 'Header dictionary written to', outfilename
+
+    def fwdifg(self):
+        if self.header['Instrument Parameters']['GFW']==1:
+            return self.ifg[:len(self.ifg)/2]
+        else: 
+            return None        
+
+    def bwdifg(self):
+        if self.header['Instrument Parameters']['GBW']==1:
+            return self.ifg[len(self.ifg)/2:][::-1]
+        else: 
+            return None        
+
+    def print_header(self, getlist=False):
+        '''Print a nice representation of the header including the names assigned to the header parameters (not complete). Return list of this if requested via <getlist=True>.'''
+        headernames = {'Data Parameters': {
+            'DPF': 'Data Point Format',
+            'FXV': 'Frequency of First Point',
+            'LXV': 'Frequency of Last Point',
+            'CSF': 'Y - Scaling Factor',
+            'MXY': 'Y - Maximum',
+            'MNY': 'Y - Minimum',
+            'DAT': 'Date of Measurement',
+            'TIM': 'Time of Measurement',
+            'DXU': 'X Units'},
+        'Acquisition Parameters': {
+            'AQM': 'Acquisition Mode',
+            'COR': 'Correlation Test Mode',
+            'DEL': 'Delay Before Measurement',
+            # 'Stabilization Delay',
+            'HFW': 'Wanted High Frequency Limit',
+            'LFW': 'Wanted Low Frequency Limit',
+            'NSS': 'Sample Scans',
+            'PLF': 'Result Spectrum',
+            'RES': 'Resolution',
+            #Signal Gain, Background
+            'TDL': 'To do list',
+            #Signal Gain, Sample', 
+            #Signal Gain, Sample 2nd Channel',
+            #Signal Gain, Background 2nd Channel'
+            },
+        'FT Parameters': {
+            'APF': 'Apodization Function',
+            'HFQ': 'End Frequency Limit for File',
+            'LFQ': 'Start Frequency Limit for File',
+            'NLI': 'Non Linearity Correction',
+            'PHR': 'Phase Resolution',
+            'PHZ': 'Phase Correction Mode',
+            'SPZ': 'Stored Phase Mode',
+            'ZFF': 'Zero Filling Factor'},
+        'Optic Parameters': {
+            'APT': 'Aperture Setting',
+            'BMS': 'Beamsplitter Setting',
+            'CHN': 'Measurement Channel',
+            'DTC': 'Detector Setting',
+            'HPF': 'High Pass Filter',
+            'LPF': 'Low Pass Filter',
+            'OPF': 'Optical Filter Setting',
+            'PGN': 'Preamplifier Gain',
+            #'Background Measurement Channel',
+            #'Extended Ready Check',
+            'SRC': 'Source Setting',
+            'VEL': 'Scanner Velocity',
+            #'Ext. Analog Signals',
+            #'External Synchronisation'
+            },
+        'Sample Parameters': {
+            #'Building',
+            #'Operator Name',
+            #'Company',
+            #'Department', 
+            #'Experiment',
+            #'Location',
+            #'Sample Form',
+            #'Sample Name',
+            #'Experiment Path',
+            #'Instrument Status'
+            },
+        'Instrument Parameters': {
+            'HFL': 'High Folding Limit',
+            'LFL': 'Low Folding Limit',
+            'LWN': 'Laser Wavenumber',
+            'ABP': 'Absolute Peak Pos in Laser*2',
+            #'Sample Spacing Divisor',
+            #'Actual Signal Gain',
+            #'Actual Ref. Signal Gain',
+            #'Number of Sample Scans',
+            'GFW': 'Number of Good FW Scans',
+            'GBW': 'Number of Good BW Scans',
+            'BFW': 'Number of Bad FW Scans',
+            'BBW': 'Number of Bad BW Scans',
+            'PKA': 'Peak Amplitude',
+            'PKL': 'Peak Location',
+            #'Backward Peak Amplitude',
+            #'Backward Peak Location',
+            #'Peak Amplitude 2nd Channel',
+            #'Peak Location 2nd Channel',
+            #'Backward Peak Amplitude 2nd Channel',
+            #'Backward Peak Location 2nd Channel',
+            #'Data Aquisition Status',
+            #'Actual Signal Gain 2nd Channel',
+            #'Humidity Interferometer',
+            #'Sample Spacing Multiplicator',
+            #'Running Sample Number',
+            #'Start time (sec)',
+            #'Scan time (sec)',
+            #'Scanner Temperature',
+            #'Max. Velocity Deviation',
+            #'Pressure Interferometer (hPa)',
+            #'Analog Signal 1',
+            #'Analog Signal 2',
+            #'Firmware version',
+            #'Instrument Serial Number',
+            #'Instrument Type',
+            #'Focal Length',
+            #'Ready Check',
+            #'Number of Background Scans'
+        },
+        'Datafile History':{}
+        }
+        headerlist = [] 
+        for i in self.header.keys():
+            print i
+            for j in self.header[i].keys():
+                if i in headernames.keys() and j in headernames[i].keys():
+                    print '  %3s %030s %030s'%(j, headernames[i][j], self.header[i][j])
+                    headerlist.append((i, j, headernames[i][j], self.header[i][j]))
+                else:
+                    print '  %3s '%(j)+' '*30+'%030s'%(self.header[i][j])
+                    headerlist.append((i, j, ' ', self.header[i][j]))
+        if getlist:
+            return headerlist
+        else: pass
+
+    def get_datafile_history(self):
+        try:
+            for i in self.filestructure.keys():
+                if i[:21]=='[unknown block 0] len':
+                    if int(i[21:])>200:
+                        n = i
+                else: pass
+            s = self.filestructure[n]
+            with open(self.path, 'rb') as f:
+                f.seek(s['offset'])
+                a = f.read(s['length']*4)
+            #print 'Read Datafile History to self.datafile_history'
+            return a           
+        except Exception, e:
+            print 'Failed reading Datafile History', self.filename
+
+    def get_block(self, pointer, length):
+        '''Get data block from opys.path at <pointer> with length <length>.'''
+        self.log.append('Getting data block at '+str(pointer)+' with length '+str(length))
+        with open(self.path, 'rb') as f:
+            f.seek(pointer)
+            dat = np.array(struct.unpack(str(length)+'f', f.read(length*4)))
+        return dat
+
+    def replace_datablock(self, blockname, newfilename, newdatablock):
+        '''Replace the data block <blockname> with data in <newdatablock> and write to <newfilename>.'''
+        #locate spectrum data block
+        self.log.append('Replacing datablock'+blockname+' and writing output to '+newfilename)
+        if os.path.exists(newfilename):
+            print 'File already exists: ', newfilename, ' not doing anything ...'
+            self.log.append('File already exists: '+newfilename+' not doing anything ...')
+        else:
+            pointer = self.filestructure[blockname]['offset']
+            olddatablocklen = self.filestructure[blockname]['length']
+            newdatablocklen = len(newdatablock)
+            print(olddatablocklen, newdatablocklen)
+            if olddatablocklen!=newdatablocklen:
+                self.log.append('Old and new datablocks have different size not doing anything ...')
+                print 'Old and new datablocks have different size not doing anything ...'
+            else:
+                # format new spectrum data
+                newdatablock_packed = struct.pack(str(newdatablocklen)+'f', *newdatablock)
+                # get content of original file
+                with open(self.path, 'rb') as f:
+                    old_file = f.read()
+                # write original file until spc-data-block, write new block, write rest of orig. file
+                new_file = old_file[:pointer]+newdatablock_packed+old_file[pointer+4*newdatablocklen:]
+                with open(newfilename, 'wb') as f:
+                    f.write(new_file)
+                print 'Replaced data block and output written to '+newfilename
+                self.log.append('Replaced data block and output written to '+newfilename)
+
+
+    def get_datablocks(self, block):
+        '''Read a datablock named <block> and retrieve x- and y-axis np.arrays from it.'''
+        self.log.append('Getting data blocks')
+        datablocks = {}
+        #print(self.get_block(self.search_block(block)['offset'], self.search_block(block)['length'])[:-1])
+        yax = [0.0]
+        for element in self.get_block(self.search_block(block)['offset'], self.search_block(block)['length'])[:-1]:
+            yax.append(element)
+        yax = np.array(yax)
+        #yax = np.array(self.get_block(self.search_block(block)['offset'], self.search_block(block)['length']))
+        if block == 'Data Block IgSm':
+            self.log.append('Getting ifg data block')
+            xax = np.linspace(0,2*0.9/float(self.header['Acquisition Parameters']['RES']), len(yax))
+        if block == 'Data Block SpSm':
+            self.log.append('Getting spc data block')
+            xax = np.linspace(self.header['Data Parameters SpSm']['FXV'], self.header['Data Parameters SpSm']['LXV'], len(yax))
+        if block == 'Data Block ScSm':
+            self.log.append('Getting spc data block')
+            xax = np.linspace(self.header['Data Parameters ScSm']['FXV'], self.header['Data Parameters ScSm']['LXV'], len(yax))
+        if block == 'Data Block TrSm':
+            self.log.append('Getting trm data block')
+            xax = np.linspace(self.header['Data Parameters TrSm']['FXV'], self.header['Data Parameters TrSm']['LXV'], len(yax))
+        return xax, yax
+
+    def get_slices(self, path):
+        self.slices = {}
+        self.slices_headers = {}
+        slice_list = os.listdir(os.path.join(self.path, 'scan'))
+        slice_list.sort()
+        good_slice_list = []
+        for i in slice_list:
+            if i[-5:]!='.info':
+                try:
+                    self.filename = i
+                    self.folder = os.path.join(path, 'scan')
+                    self.path = os.path.join(path, 'scan', i)
+                    #print 'testing opus file', i
+                    self.test_if_opusfile()
+                    if self.status:
+                        #print 'read header', self.path
+                        self.read_header()
+                        if self.has_block('Data Block IgSm'):
+                            opd, ifg = self.get_datablocks('Data Block IgSm')
+                            self.read_header()
+                            self.slices_headers[i[1:9]+'_header'] = self.header
+                            self.slices[i[1:9]] = ifg
+                            good_slice_list.append(i)
+                        else: pass
+                    else: pass
+                except: pass
+            else: pass
+        if len(good_slice_list)>0:
+            #print self.slices.keys()
+            self.filename = good_slice_list[0]
+            self.folder = os.path.join(self.path, 'scan')
+            self.path = os.path.join(path, 'scan', good_slice_list[0])
+            self.read_header()
+            ifg = np.array([])
+            for i in good_slice_list:
+                if i[-5:]!='.info' and i[1:9] in self.slices.keys():
+                    ifg = np.concatenate([ifg, self.slices[i[1:9]]])
+                else: pass
+            self.ifg = ifg
+            self.opd = np.linspace(0,2*0.9/float(self.header['Acquisition Parameters']['RES']), len(self.ifg))
+        else:
+            print 'Error loading slices from ', path
+            self.status = False
+        return 0
+
+    def test_if_opusfile(self):
+        '''Check the initialized filename for Opus' magic number.'''
+        self.log.append('testing if opus file')
+        opusmagicval = '\n\n\xfe\xfe'
+        try:
+            with open(self.path, 'rb') as f:
+                f.seek(0)
+                magic = f.read(4)
+            if magic==opusmagicval:
+                if self.verbose:
+                    self.log.append('Identified '+self.path+' as Opus file ...')
+                    #print 'Identified ', self.path, ' as Opus file ...'
+                self.status=True
+            else:
+                self.log.append('Bad Magic found in '+self.path)
+                print 'Bad Magic in ', self.path
+                self.status=False
+        except Exception, e:
+            self.log.append(e)
+            self.status=False
+
+    def search_block(self, blockname):
+        '''Searches a <blockname> within the identifies Opus file structure. Returns dictionary entry of the block <blockname>.'''
+        if blockname in self.filestructure.keys():
+            return self.filestructure[blockname]
+        else: 
+            self.log.append('Could not find '+blockname+' in self.filestructure.keys()')
+
+    def print_filestructure(self):
+        '''Printinf the file structure of the opus file. This includes found data blocks, their binary lengths and offsets.'''
+        for i in self.filestructure.keys():
+            print i, '\n\toffset =', self.filestructure[i]['offset'], '\n\tlength =', self.filestructure[i]['length']
+
+    def print_log(self):
+        '''Printing the log of everything that has happened to the class object to std out'''
+        for i in self.log:
+            print i
+    
+    def compare_opus_header(self, header2, verbose=True):
+        '''Compare this instances header with another <header2>. If <verbose=False> only differences are shown.'''
+        S = ' this header           the other header \n'
+        for i in self.header.keys(): 
+            if i in header2.keys():
+                if verbose:
+                    S += '\n'+str(i)+'\n'
+                else: pass
+                for j in self.header[i].keys():
+                    try:
+                        a, b = self.header[i][j], header2[i][j]
+                        if a==b and verbose:
+                            s = j+' '*67+'\n'
+                            s = s[:21]+'identical'+s[30:]
+                        elif a!=b:
+                            s = j+' '*67+'\n'
+                            s = s[:8]+str(a)+s[8+len(str(a)):]
+                            s = s[:32]+str(b)+s[32+len(str(b)):]
+                        else:
+                            s = ''
+                    except:
+                        s = j+' '*67+'\n'
+                        s = s[:18]+'problem with key'+s[34:]
+                    S += s
+            else:
+                S += '\n'+str(i)+' missing in other header \n'
+        return S
+    
+    def has_block(self, blockname):
+        '''Check if <blockname> is present in opys.filestructure.'''
+        if blockname in self.filestructure.keys():
+            return True
+        else:
+            return False  
+
+    def __init__(self, path, verbose=False, getspc=False, getifg=False, gettrm=False, getslices=False):
+        self.log = []
+        self.status = True
+        self.verbose = verbose
+        self.path = path
+        if self.verbose:
+            print 'Initializing ...'
+        self.log.append('Initializing')
+        try:
+            if path.rfind('/')>0:
+                self.folder = path[:path.rfind('/')]
+                self.filename = path[path.rfind('/')+1:]
+            else:
+                self.folder = './'
+                self.filename = path
+            if not getslices:
+                self.test_if_opusfile()
+            if self.status:
+                if not getslices:
+                    self.read_header()
+                else: pass
+                if getspc and self.has_block('Data Block SpSm'):
+                    self.spcwvn, self.spc = self.get_datablocks('Data Block SpSm')
+                elif getspc and self.has_block('Data Block ScSm'):
+                    self.log.append('Setting self.spc tp ScSm instead of SpSm')
+                    self.spcwvn, self.spc = self.get_datablocks('Data Block ScSm')
+                else: self.log.append('No Spectrum requested or not found ... skipping.')
+                if gettrm and self.has_block('Data Block TrSm'):
+                    self.trmwvn, self.trm = self.get_datablocks('Data Block TrSm')
+                else: self.log.append('No Transmissionspectrum requested or not found ... skipping.')
+                if getifg and self.has_block('Data Block IgSm'):
+                    self.ifgopd, self.ifg = self.get_datablocks('Data Block IgSm')
+                else: self.log.append('No Interferogram requested or not found ... skipping.')
+                if getslices:
+                    self.get_slices(path)
+                else: self.log.append('No Interferogram requested or not found ... skipping.')
+                if self.verbose and self.status:
+                    self.log.append('Finished initializing opus object.\n\n')
+                    print '\n\tFinished initializing opys object.'
+            else: raise(ValueError('Does not seem to be an Opus file ... skipping'))
+            if self.verbose and not self.status:
+                self.log.append('An error occured.')
+                print 'An error occured.'
+        except Exception, e:
+            self.log.append('Problem with '+str(e))
+            print 'Error while processing '+path+' ... check self.log or do self.print_log()'
+        
+
+
+if __name__ == '__main__':
+
+    fname = sys.argv[1]
+    fname_kali = "{}.kali".format(fname)
+    fname_notimestamp = "{}.notime".format(fname)
+    o = opys(fname, verbose=False, getspc=False, getifg=False)
+    p = opys(fname_notimestamp, verbose=False, getspc=False, getifg=False)
+   
+    o.read_structure()
+    p.read_structure()
+    
+    o.replace_datablock('Data Block SpSm', fname_kali, np.flip(p.get_datablocks('Data Block SpSm')[-1],0))

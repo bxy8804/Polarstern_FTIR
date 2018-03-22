@@ -77,10 +77,13 @@ class radiosonde:
         return
 
     def plot(self, columnX, columnY, xmin, xmax, ymin, ymax):
+        fs = 30
+        ls = 30
         plt.figure()
-        plt.plot(self.__columns[columnX], self.__columns[columnY])
-        plt.ylabel(self.__names[columnY])
-        plt.xlabel(self.__names[columnX])
+        plt.plot(self.__columns[columnX], self.__columns[columnY], lw=2)
+        plt.ylabel(self.__names[columnY], fontsize=fs)
+        plt.xlabel(self.__names[columnX], fontsize=fs)
+        plt.tick_params(labelsize=ls)
         plt.xlim([xmin, xmax])
         plt.ylim([ymin, ymax])
         plt.grid(True)
@@ -182,8 +185,8 @@ class radiosonde:
 #                print("  {:.4E}".format(float(reversedTemperatureRadioNew[i])+273.15))
 
 if __name__ == "__main__":
-    filename = "Radiosonde/PS170703.w11"
+    filename = "Radiosonde/PS170630.w11"
     x = radiosonde(filename)
-    #x.plot(3,2, xmin=-75, xmax=10, ymin=0, ymax=25000)
+    x.plot(3,2, xmin=-75, xmax=10, ymin=0, ymax=25000)
     #x.showHeader()
     #x.interpolateSFIT()
