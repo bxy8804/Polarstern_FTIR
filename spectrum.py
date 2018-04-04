@@ -488,7 +488,7 @@ class spectrum:
             self.__opusFile[i].print_header()
         return
 
-    def toText(self, fname, wnmin=0, wnmax=2000, smooth=0.0):
+    def toText(self, fname, wnmin=0, wnmax=2000, smooth=0.0, fit=0, fact=1.0):
         f = open(fname, "w")
         spectrum = []
         wavenumber = []
@@ -497,13 +497,20 @@ class spectrum:
                 wavenumber.append(self.__opusFile[0].spcwvn[i])
                 spectrum.append(self.__opusFile[0].spc[i])
 
+        if(fit != 0):
+            coeff = np.polyfit(wavenumber, spectrum, fit)
+            print(coeff)
+
         #for j in range(1000):
         #    for i in range(len(spectrum)):
         #        if(i > 0 and np.abs(spectrum[i-1] - spectrum[i]) > smooth):#Lazy evaluation?
         #            spectrum[i] = (spectrum[i-1] + spectrum[i+1]) / 2.0
 
         for i in range(len(spectrum)):
-            f.write("{};{}\n".format(wavenumber[i], spectrum[i]))
+            if(fit != 0):
+                f.write("{};{}\n".format(wavenumber[i], fact*(coeff[0]*wavenumber[i] + coeff[1])))
+            else:
+                f.write("{};{}\n".format(wavenumber[i], spectrum[i]*fact))
 
-        f.close()
+        #f.close()
         return
